@@ -1,4 +1,4 @@
-module go-sql
+module github.com/12345debdut/go-sql
 
 go 1.24.0
 
