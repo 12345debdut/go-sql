@@ -1,17 +1,21 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"sync"
 
-	"go-sql/models"
+	"github.com/12345debdut/go-sql/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
+// DbClient Used sync map to store the database connection
+// This should be concurrent safe so that multiple goroutines can access the same database concurrently
 type DbClient struct {
-	providers map[string]*gorm.DB
+	providers sync.Map
 }
 
 func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, error) {
@@ -29,22 +33,87 @@ func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, 
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
-	db.providers[config.DbName] = ormDb
+	db.providers.Store(config.DbName, &DbProvider{config: config, dbDriver: ormDb, mutex: &sync.RWMutex{}})
 	return ormDb, nil
 }
 
 func (db *DbClient) Disconnect() error {
-	for dbName, ormDb := range db.providers {
+	var resultError error
+	db.providers.Range(func(key, value interface{}) bool {
+		dbName, dbNameOk := key.(string)
+		if dbNameOk == false {
+			resultError = errors.New("Key is not a string")
+			return false
+		}
+		dbProvider, dbValueOk := value.(*DbProvider)
+		if dbValueOk == false {
+			resultError = errors.New("Value is not a DbProvider")
+			return false
+		}
 		log.Printf("Disconnecting from database: %s\n", dbName)
-		sqlDb, err := ormDb.DB()
+		sqlDb, err := dbProvider.dbDriver.DB()
 		if err != nil {
+			resultError = err
 			log.Fatalf("Failed to disconnect from database: %v", err)
-			return err
+			return false
 		}
 		closeErr := sqlDb.Close()
 		if closeErr != nil {
-			return closeErr
+			resultError = err
+			return false
 		}
+		return true
+	})
+	if resultError != nil {
+		return resultError
 	}
 	return nil
+}
+
+func (db *DbClient) ReadLock(config models.SqlClientConnectionConfig) {
+	provider, ok := db.providers.Load(config.DbName)
+	if ok == false {
+		return
+	}
+	dbProvider, ok := provider.(*DbProvider)
+	if ok == false {
+		return
+	}
+	dbProvider.mutex.RLock()
+}
+
+func (db *DbClient) ReadUnlock(config models.SqlClientConnectionConfig) {
+	provider, ok := db.providers.Load(config.DbName)
+	if ok == false {
+		return
+	}
+	dbProvider, ok := provider.(*DbProvider)
+	if ok == false {
+		return
+	}
+	dbProvider.mutex.RUnlock()
+}
+
+func (db *DbClient) WriteLock(config models.SqlClientConnectionConfig) {
+	provider, ok := db.providers.Load(config.DbName)
+	if ok == false {
+		return
+	}
+	dbProvider, ok := provider.(*DbProvider)
+	if ok == false {
+		return
+	}
+	dbProvider.mutex.Lock()
+}
+
+func (db *DbClient) WriteUnlock(config models.SqlClientConnectionConfig) {
+	provider, ok := db.providers.Load(config.DbName)
+	if ok == false {
+		return
+	}
+	dbProvider, ok := provider.(*DbProvider)
+	if ok == false {
+		return
+	}
+	dbProvider.mutex.Unlock()
 }
