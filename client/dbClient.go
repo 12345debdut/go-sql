@@ -42,12 +42,12 @@ func (db *DbClient) Disconnect() error {
 	db.providers.Range(func(key, value interface{}) bool {
 		dbName, dbNameOk := key.(string)
 		if dbNameOk == false {
-			resultError = errors.New("Key is not a string")
+			resultError = errors.New("key is not a string")
 			return false
 		}
 		dbProvider, dbValueOk := value.(*DbProvider)
 		if dbValueOk == false {
-			resultError = errors.New("Value is not a DbProvider")
+			resultError = errors.New("value is not a DbProvider")
 			return false
 		}
 		log.Printf("Disconnecting from database: %s\n", dbName)
