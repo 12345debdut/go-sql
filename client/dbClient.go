@@ -1,11 +1,11 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"sync"
 
+	"github.com/12345debdut/go-sql/exceptions"
 	"github.com/12345debdut/go-sql/models"
 
 	"gorm.io/driver/postgres"
@@ -42,12 +42,12 @@ func (db *DbClient) Disconnect() error {
 	db.providers.Range(func(key, value interface{}) bool {
 		dbName, dbNameOk := key.(string)
 		if dbNameOk == false {
-			resultError = errors.New("key is not a string")
+			resultError = &exceptions.DbNameMissingError{Key: dbName}
 			return false
 		}
 		dbProvider, dbValueOk := value.(*DbProvider)
 		if dbValueOk == false {
-			resultError = errors.New("value is not a DbProvider")
+			resultError = &exceptions.DbProviderNotValidError{Key: dbName, Value: dbProvider}
 			return false
 		}
 		log.Printf("Disconnecting from database: %s\n", dbName)
