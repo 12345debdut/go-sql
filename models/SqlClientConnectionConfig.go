@@ -9,7 +9,7 @@ import (
 
 type SqlClientConnectionConfig struct {
 	Host       string
-	Port       int
+	Port       string
 	User       string
 	Password   string
 	DbName     string
