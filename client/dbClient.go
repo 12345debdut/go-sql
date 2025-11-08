@@ -31,12 +31,12 @@ func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, 
 	for i := 0; i < config.RetryCount; i++ {
 		ormDb, err := gorm.Open(postgres.Open(dsn), config.OrmConfig)
 		if err == nil {
-			println("DB connected successfully")
+			log.Println("DB connected successfully")
 			resultOrmDB = ormDb
-			err = ormDb.AutoMigrate(config.Models...)
-			if err != nil {
-				log.Fatalf("Failed to migrate database: %v", err)
-			}
+			//err = ormDb.AutoMigrate(config.Models...)
+			//if err != nil {
+			//	log.Fatalf("Failed to migrate database: %v", err)
+			//}
 			db.providers.Store(config.DbName, &DbProvider{config: config, dbDriver: ormDb, mutex: &sync.RWMutex{}})
 			break
 		}
