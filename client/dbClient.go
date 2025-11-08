@@ -21,8 +21,8 @@ type DbClient struct {
 
 func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, error) {
 	sslModeDb, err := models.SslModeDBVersion(config.SslMode)
-	if err == nil {
-		log.Fatal(err)
+	if err != nil {
+		log.Fatalf("Failed to parse SSL mode: %v", err)
 		return nil, err
 	}
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", config.Host, config.User, config.Password, config.DbName, config.Port, sslModeDb)
@@ -33,10 +33,10 @@ func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, 
 		if err == nil {
 			log.Println("DB connected successfully")
 			resultOrmDB = ormDb
-			//err = ormDb.AutoMigrate(config.Models...)
-			//if err != nil {
-			//	log.Fatalf("Failed to migrate database: %v", err)
-			//}
+			err = ormDb.AutoMigrate(config.Models...)
+			if err != nil {
+				log.Fatalf("Failed to migrate database: %v", err)
+			}
 			db.providers.Store(config.DbName, &DbProvider{config: config, dbDriver: ormDb, mutex: &sync.RWMutex{}})
 			break
 		}
