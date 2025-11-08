@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/12345debdut/go-sql/exceptions"
 	"github.com/12345debdut/go-sql/models"
@@ -25,16 +26,24 @@ func (db *DbClient) Connect(config models.SqlClientConnectionConfig) (*gorm.DB, 
 		return nil, err
 	}
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", config.Host, config.User, config.Password, config.DbName, config.Port, sslModeDb)
-	ormDb, err := gorm.Open(postgres.Open(dsn), config.OrmConfig)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+	log.Printf("Connecting to database %s", dsn)
+	var resultOrmDB *gorm.DB
+	for i := 0; i < config.RetryCount; i++ {
+		ormDb, err := gorm.Open(postgres.Open(dsn), config.OrmConfig)
+		if err == nil {
+			println("DB connected successfully")
+			resultOrmDB = ormDb
+			err = ormDb.AutoMigrate(config.Models...)
+			if err != nil {
+				log.Fatalf("Failed to migrate database: %v", err)
+			}
+			db.providers.Store(config.DbName, &DbProvider{config: config, dbDriver: ormDb, mutex: &sync.RWMutex{}})
+			break
+		}
+		log.Printf("DB not ready (%v), retrying in %fs... [%d/10]\n", err, config.RetryWait.Seconds(), i+1)
+		time.Sleep(config.RetryWait)
 	}
-	err = ormDb.AutoMigrate(config.Models...)
-	if err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
-	}
-	db.providers.Store(config.DbName, &DbProvider{config: config, dbDriver: ormDb, mutex: &sync.RWMutex{}})
-	return ormDb, nil
+	return resultOrmDB, nil
 }
 
 func (db *DbClient) Disconnect() error {

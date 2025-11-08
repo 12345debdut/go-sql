@@ -2,19 +2,22 @@ package models
 
 import (
 	"log"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 type SqlClientConnectionConfig struct {
-	Host      string
-	Port      int
-	User      string
-	Password  string
-	DbName    string
-	SslMode   SslMode
-	OrmConfig *gorm.Config
-	Models    []interface{}
+	Host       string
+	Port       int
+	User       string
+	Password   string
+	DbName     string
+	SslMode    SslMode
+	OrmConfig  *gorm.Config
+	RetryCount int
+	RetryWait  time.Duration
+	Models     []interface{}
 }
 
 type SslMode int
